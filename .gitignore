@@ -1,0 +1,159 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.hypothesis/
+.pytest_cache/
+cover/
+tests/test_output.log
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv
+env.bak/
+venv.bak/
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+# Cython debug symbols
+cython_debug/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Logs
+logs/
+*.log
+*.log.*
+
+# Model files (users provide their own)
+weights/
+models/*.pt
+models/*.h5
+models/*.onnx
+models/*.pb
+models/*.pth
+models/*.weights
+models/best.pt
+models/model.pt
+*.pt
+*.pth
+*.h5
+*.onnx
+
+# Keep the models directory structure
+!models/.gitkeep
+
+# Test data and outputs
+test_images/
+test_outputs/
+temp_test_files/
+
+# Data files (except default files)
+data/*.csv
+data/*.xlsx
+data/*.db
+# Keep default data files
+!data/recipes.json
+!data/classes.txt
+
+# Docker
+docker-compose.override.yml
+.docker/
+
+# Data/cache
+.cache/
+*.cache
+.torch/
+.EasyOCR/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Uploaded images (if storing user uploads)
+uploads/
+user_data/
+
+# Large binary files
+*.bin
+*.pickle
+*.pkl
