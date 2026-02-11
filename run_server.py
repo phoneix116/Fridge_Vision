@@ -44,9 +44,7 @@ def main():
             app,
             host=API_CONFIG['host'],
             port=API_CONFIG['port'],
-            debug=API_CONFIG['debug'],
             reload=API_CONFIG['reload'],
-            workers=API_CONFIG['workers'],
             log_level=LOG_LEVEL.lower()
         )
     

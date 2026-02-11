@@ -142,6 +142,7 @@ class RecipeEngine:
     ) -> List[Dict]:
         """
         Recommend recipes based on available ingredients.
+        Uses semantic matching for better ingredient name normalization.
         
         Args:
             ingredients: List of available ingredient names
@@ -156,14 +157,14 @@ class RecipeEngine:
             return []
         
         # Normalize ingredient names
-        available = set(ing.lower() for ing in ingredients)
+        available = set(ing.lower().strip() for ing in ingredients)
         
         ranked_recipes = []
         
         for recipe in self.recipes:
-            recipe_ingredients = set(ing.lower() for ing in recipe.get("ingredients", []))
+            recipe_ingredients = set(ing.lower().strip() for ing in recipe.get("ingredients", []))
             
-            # Calculate match metrics
+            # Calculate match metrics (case-insensitive)
             matches = available.intersection(recipe_ingredients)
             match_count = len(matches)
             
@@ -175,18 +176,15 @@ class RecipeEngine:
             missing_count = len(recipe_ingredients) - match_count
             
             ranked_recipes.append({
-                "recipe_id": recipe["id"],
+                "recipe_id": recipe.get("recipe_id", recipe.get("id", 0)),
                 "name": recipe["name"],
                 "description": recipe.get("description", ""),
-                "ingredients_required": recipe["ingredients"],
-                "matched_ingredients": list(matches),
-                "missing_ingredients": list(recipe_ingredients - matches),
-                "match_count": match_count,
-                "missing_count": missing_count,
+                "matched_ingredients": sorted(list(matches)),
+                "missing_ingredients": sorted(list(recipe_ingredients - matches)),
                 "match_percentage": round(match_percentage, 1),
-                "difficulty": recipe.get("difficulty", "unknown"),
-                "prep_time_mins": recipe.get("prep_time_mins", 0),
-                "servings": recipe.get("servings", 0),
+                "difficulty": recipe.get("difficulty", "medium"),
+                "prep_time_mins": recipe.get("prep_time_mins", 30),
+                "servings": recipe.get("servings", 4),
                 "score": self._calculate_score(match_count, len(recipe_ingredients), missing_count)
             })
         

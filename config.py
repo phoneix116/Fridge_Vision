@@ -16,10 +16,10 @@ CLASSES_FILE = DATA_DIR / "classes.txt"
 RECIPES_FILE = DATA_DIR / "recipes.json"
 
 # Model configuration
-MODEL_PATH = os.getenv("MODEL_PATH", None)  # Path to local model file
+MODEL_PATH = os.getenv("MODEL_PATH", str(PROJECT_ROOT / "models" / "weights2_fridge_vision.pt"))
 MODEL_CONFIG = {
     "model_path": MODEL_PATH,
-    "conf_threshold": float(os.getenv("CONF_THRESHOLD", "0.25")),
+    "conf_threshold": float(os.getenv("CONF_THRESHOLD", "0.5")),
     "iou_threshold": float(os.getenv("IOU_THRESHOLD", "0.45")),
 }
 
@@ -100,6 +100,9 @@ def print_config():
     print("\n=== Fridge Vision Configuration ===")
     for section, values in config.items():
         print(f"\n[{section.upper()}]")
-        for key, val in values.items():
-            print(f"  {key}: {val}")
+        if isinstance(values, dict):
+            for key, val in values.items():
+                print(f"  {key}: {val}")
+        else:
+            print(f"  {values}")
     print("\n====================================\n")

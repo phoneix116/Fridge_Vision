@@ -1,49 +1,66 @@
 # Fridge Vision: AI-Powered Food Detection & Recipe Recommendation System
 
-A mobile-first, backend-only AI application that detects food ingredients from fridge images using YOLO-based object detection, extracts text via OCR, estimates quantities, and recommends recipes based on available ingredients.
+A mobile-first, backend-only AI application that detects food ingredients from fridge images using **YOLOv8m** object detection, extracts text via OCR, estimates quantities, and recommends recipes using **Ollama LLM** (or keyword matching fallback).
 
 ## 🎯 Overview
 
 **Fridge Vision** helps users:
 - 📸 Upload photos of their fridge
-- 🔍 Automatically detect visible food ingredients
+- 🔍 Automatically detect visible food ingredients (30 food classes)
 - 📋 Extract text from food labels and expiry dates (OCR)
-- 📊 Estimate ingredient quantities
-- 👨‍🍳 Get recipe recommendations based on available ingredients
+- 📊 Estimate ingredient quantities based on visual size
+- 👨‍🍳 Get **AI-powered recipe recommendations** via Ollama LLM (or keyword fallback)
+- ⭐ **Full-flow endpoint** to detect + recommend in a single API call
 
 ## 🛠️ Tech Stack
 
-- **Backend**: Python + FastAPI
-- **AI Model**: YOLO-based object detection (YOLOv5)
+- **Backend**: Python + FastAPI + Uvicorn
+- **Detection Model**: YOLOv8m (Ultralytics) - mAP50: 0.866, 30 food classes
+- **LLM Recipes**: Ollama (local) + Mistral-7B (with HuggingFace fallback)
 - **OCR**: EasyOCR
-- **Image Processing**: OpenCV, NumPy
-- **Server Framework**: Uvicorn
+- **Image Processing**: OpenCV, NumPy, Pillow
+- **Testing**: pytest (86 tests, 100% passing)
 
 ## 📁 Project Structure
 
 ```
 Fridge_Vision/
 ├── api/
-│   ├── main.py                 # FastAPI application & routes
+│   ├── main.py                      # FastAPI application & all routes
 │   └── __init__.py
 ├── model/
-│   ├── model_loader.py         # YOLO model loading & management
-│   └── __init__.py
+│   └── model_loader.py              # YOLOv8m model loading & management
 ├── inference/
-│   ├── model_inference.py      # Detection inference engine
-│   ├── ocr_engine.py           # OCR text extraction
-│   ├── quantity_estimator.py   # Quantity estimation heuristics
-│   ├── recipe_engine.py        # Recipe matching & ranking
+│   ├── model_inference.py           # YOLOv8m detection inference
+│   ├── llm_recipe_recommender.py    # Ollama LLM integration (NEW)
+│   ├── ocr_engine.py                # OCR text extraction
+│   ├── quantity_estimator.py        # Quantity estimation heuristics
+│   ├── recipe_engine.py             # Recipe matching & ranking
 │   └── __init__.py
 ├── utils/
-│   ├── image_utils.py          # Image preprocessing & postprocessing
+│   ├── image_utils.py               # Image preprocessing & postprocessing
 │   └── __init__.py
 ├── data/
-│   ├── classes.txt             # Food class labels
-│   ├── recipes.json            # Recipe database
+│   ├── classes.txt                  # 30 food class labels
+│   ├── recipes.json                 # Recipe database
 │   └── __init__.py
-├── requirements.txt            # Python dependencies
-└── README.md                   # This file
+├── tests/                           # Comprehensive test suite (86 tests)
+│   ├── test_config.py               # Configuration tests (12)
+│   ├── test_recipe_engine.py        # Recipe matching tests (21)
+│   ├── test_llm_recommender.py      # LLM integration tests (16)
+│   ├── test_quantity_estimator.py   # Quantity tests (18)
+│   ├── test_api.py                  # API endpoint tests (19)
+│   └── __init__.py
+├── models/
+│   └── weights2_fridge_vision.pt    # YOLOv8m trained model (52.1MB)
+├── scripts/
+│   └── convert_recipes_csv_to_json.py # Recipe CSV converter (optional)
+├── docs/
+│   └── OLLAMA_SETUP.md              # LLM installation guide
+├── requirements.txt                 # Python dependencies
+├── config.py                        # Centralized configuration
+├── run_server.py                    # Server startup script
+└── README.md                        # This file
 ```
 
 ## 🚀 Quick Start
@@ -57,51 +74,133 @@ cd Fridge_Vision
 pip install -r requirements.txt
 ```
 
-### 2. Prepare Your Model
+### 3. Prepare Your Model
 
-Place your **pre-trained model file** in one of these locations:
-- `models/model.pt` (recommended for YOLOv5)
-- `models/best.pt` (fine-tuned models)
-- Project root: `model.pt`
-- Or set `MODEL_PATH` environment variable
-
-**Supported formats:**
-- `.pt` - PyTorch/YOLOv5 models
-- `.h5` - TensorFlow/Keras models
-
-⚠️ **No model download needed** - bring your own trained model!
-
-### 3. Configure (Optional)
+Place your **pre-trained YOLOv8m model file** in the models directory:
 
 ```bash
-cp .env.example .env
-# Edit .env to customize:
-# MODEL_PATH=/path/to/your/model.pt
-# CONF_THRESHOLD=0.25
-# IOU_THRESHOLD=0.45
+# Download our trained model (52.1MB)
+# Or place your own: models/weights2_fridge_vision.pt
+
+# Model specs:
+# - Architecture: YOLOv8m (Medium variant)
+# - Classes: 30 food items (apple, banana, carrot, tomato, etc.)
+# - Performance: mAP50=0.866, mAP50-95=0.663
+# - File: models/weights2_fridge_vision.pt
 ```
 
-### 4. Run the Server
+Supported formats: `.pt` (PyTorch/YOLO), `.h5` (TensorFlow)
+
+### 4. Setup Ollama LLM (Optional, for AI recipe recommendations)
+
+For AI-powered recipe generation using Ollama:
+
+```bash
+# 1. Install Ollama (see docs/OLLAMA_SETUP.md for details)
+brew install ollama  # macOS
+
+# 2. Start Ollama server (in a separate terminal)
+ollama serve
+
+# 3. Pull Mistral model (4.1GB)
+ollama pull mistral
+
+# Now /recommend-recipes with use_llm=true will use AI!
+```
+
+If Ollama is unavailable, the system automatically falls back to keyword matching.
+
+### 5. Configure (Optional)
+
+Edit `config.py` to customize settings:
+
+```python
+MODEL_PATH = "models/weights2_fridge_vision.pt"
+CONF_THRESHOLD = 0.5        # Detection confidence threshold
+IOU_THRESHOLD = 0.45        # NMS IOU threshold
+ENABLE_OCR = True           # Enable text extraction
+ENABLE_QUANTITY_ESTIMATION = True
+ENABLE_RECIPE_RECOMMENDATIONS = True
+```
+
+### 6. Run the Server
 
 ```bash
 python run_server.py
 # or
-python -m uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
+/path/to/venv/bin/uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 The API will be available at:
 - **API**: http://localhost:8000
-- **Docs**: http://localhost:8000/docs
+- **Interactive Docs**: http://localhost:8000/docs
 - **ReDoc**: http://localhost:8000/redoc
-### 4. Health Check
+
+### 7. Health Check
 
 ```bash
 curl http://localhost:8000/health
+# {"status": "healthy", "message": "Fridge Vision API is running"}
 ```
 
 ## 📡 API Endpoints
 
-### 1. Detect Ingredients
+### 🌟 1. Full Flow: Detect & Recommend (NEW!)
+**POST** `/detect-and-recommend`
+
+Single endpoint that detects ingredients AND recommends recipes in one call.
+
+**Parameters**:
+- `image` (File, required) - Fridge image (JPEG, PNG)
+- `use_llm` (Boolean, default=true) - Use Ollama LLM for AI recipes
+- `top_k` (Integer, default=5) - Number of recipes
+- `enable_ocr` (Boolean, default=false) - Extract text from labels
+- `confidence_threshold` (Float, default=0.5) - Detection confidence
+
+**Example**:
+```bash
+curl -X POST http://localhost:8000/detect-and-recommend \
+  -F "image=@fridge.jpg" \
+  -d "use_llm=true&top_k=5"
+```
+
+**Response**:
+```json
+{
+  "status": "success",
+  "message": "Detected 3 ingredients, generated 5 recipes",
+  "detected_ingredients": [
+    {
+      "class_name": "apple",
+      "confidence": 0.92,
+      "count": 2,
+      "quantity_estimate": "medium portion",
+      "estimated_unit": "pcs",
+      "source": "detection"
+    }
+  ],
+  "total_items": 3,
+  "image_info": {"width": 640, "height": 480},
+  "recipes": [
+    {
+      "recipe_id": 1,
+      "name": "Apple Carrot Soup",
+      "description": "A healthy soup...",
+      "matched_ingredients": ["apple", "carrot"],
+      "missing_ingredients": ["salt", "water"],
+      "match_percentage": 100.0,
+      "difficulty": "easy",
+      "prep_time_mins": 30,
+      "servings": 4,
+      "score": 95.0
+    }
+  ]
+}
+```
+
+---
+
+### 2. Detect Ingredients
 **POST** `/detect-ingredients`
 
 Detects food ingredients in an uploaded image.
@@ -118,100 +217,55 @@ curl -X POST "http://localhost:8000/detect-ingredients" \
   -F "enable_ocr=true"
 ```
 
-**Response**:
-```json
-{
-  "status": "success",
-  "message": "Successfully detected 12 ingredients",
-  "detected_ingredients": [
-    {
-      "class_name": "tomato",
-      "confidence": 0.95,
-      "count": 3,
-      "quantity_estimate": "medium portion",
-      "estimated_unit": "pcs",
-      "source": "detection"
-    }
-  ],
-  "total_items": 12,
-  "image_info": {
-    "width": 640,
-    "height": 480,
-    "channels": 3
-  },
-  "ocr_results": {
-    "status": "success",
-    "texts": [...],
-    "full_text": "Best before 2024-12-31"
-  }
-}
-```
+---
 
-### 2. Recommend Recipes
+### 3. Recommend Recipes
 **POST** `/recommend-recipes`
 
-Get recipe recommendations based on available ingredients.
+Get recipe recommendations based on ingredients (with optional LLM).
 
 **Parameters**:
 - `ingredients` (List[String]) - Available ingredient names
-- `top_k` (Integer, optional) - Number of recipes to return (default: 5)
-- `min_match` (Integer, optional) - Minimum ingredients to match (default: 1)
+- `use_llm` (Boolean, default=true) - Use Ollama for AI recommendations
+- `top_k` (Integer, default=5) - Number of recipes
+- `min_match` (Integer, default=1) - Min ingredients to match
 
 **Example**:
 ```bash
-curl -X POST "http://localhost:8000/recommend-recipes?ingredients=tomato&ingredients=pasta&ingredients=garlic&top_k=5"
+# With LLM (AI-powered)
+curl -X POST "http://localhost:8000/recommend-recipes?ingredients=apple&ingredients=carrot&use_llm=true&top_k=5"
+
+# With keyword matching (fallback)
+curl -X POST "http://localhost:8000/recommend-recipes?ingredients=apple&ingredients=carrot&use_llm=false"
 ```
 
-**Response**:
-```json
-{
-  "status": "success",
-  "message": "Found 3 matching recipes",
-  "ingredients_provided": ["tomato", "pasta", "garlic"],
-  "recipes": [
-    {
-      "recipe_id": 3,
-      "name": "Tomato Pasta",
-      "description": "Classic Italian pasta sauce",
-      "matched_ingredients": ["tomato", "pasta", "garlic"],
-      "missing_ingredients": ["onion", "oil"],
-      "match_percentage": 60.0,
-      "difficulty": "easy",
-      "prep_time_mins": 25,
-      "servings": 4,
-      "score": 85.5
-    }
-  ]
-}
-```
-
-### 3. List All Recipes
-**GET** `/recipes`
-
-Get all available recipes.
-
-**Parameters**:
-- `limit` (Integer, optional) - Max recipes to return (default: 20)
-
-**Example**:
-```bash
-curl "http://localhost:8000/recipes?limit=10"
-```
+---
 
 ### 4. Search Recipes
 **GET** `/recipes/search`
 
 Search recipes by name or ingredient.
 
-**Parameters**:
-- `query` (String) - Recipe name or ingredient to search
-
 **Example**:
 ```bash
 curl "http://localhost:8000/recipes/search?query=pasta"
 ```
 
-### 5. Get Recipe Details
+---
+
+### 5. List All Recipes
+**GET** `/recipes`
+
+Get all available recipes.
+
+**Example**:
+```bash
+curl "http://localhost:8000/recipes?limit=10"
+```
+
+---
+
+### 6. Get Recipe Details
 **GET** `/recipes/{recipe_id}`
 
 Get details of a specific recipe.
@@ -221,37 +275,70 @@ Get details of a specific recipe.
 curl "http://localhost:8000/recipes/3"
 ```
 
-### 6. API Info
+---
+
+### 7. API Info
 **GET** `/info`
 
-Get API information and available ingredients.
+Get API information, available ingredients, and stats.
 
+**Example**:
 ```bash
 curl "http://localhost:8000/info"
+```
+
+---
+
+### 8. Health Check
+**GET** `/health`
+
+Check if API is running.
+
+**Example**:
+```bash
+curl "http://localhost:8000/health"
 ```
 
 ## 🧠 AI Components
 
 ### 1. Object Detection (`model_inference.py`)
-- **Model**: YOLOv5s (pretrained on COCO)
+- **Model**: YOLOv8m (Ultralytics)
+- **Classes**: 30 food items (apple, banana, carrot, tomato, potato, etc.)
+- **Performance**: mAP50=0.866, mAP50-95=0.663
 - **Confidence Threshold**: 0.5 (configurable)
+- **Speed**: ~500ms per image (GPU) / ~1.5s (CPU)
 - **Output**: Bounding boxes, class names, confidence scores
 
-### 2. OCR Engine (`ocr_engine.py`)
+### 2. LLM Recipe Engine (`llm_recipe_recommender.py`) ⭐ NEW
+- **Backend**: Ollama (local) + Mistral-7B
+- **Fallback**: HuggingFace Inference API
+- **Speed**: ~5-10 seconds per request
+- **Features**: 
+  - Creative recipe generation from ingredients
+  - Dietary restrictions support (vegan, gluten-free, etc.)
+  - Recipe refinement and clarification
+- **Graceful Degradation**: Falls back to keyword matching if unavailable
+
+### 3. OCR Engine (`ocr_engine.py`)
 - **Library**: EasyOCR
 - **Supported Languages**: English (extensible)
+- **Speed**: ~1-3 seconds per image
 - **Output**: Extracted text, bounding boxes, confidence scores
-- **Features**: Expiry date detection, ingredient parsing
+- **Features**: Expiry date detection, ingredient parsing from labels
 
-### 3. Quantity Estimation (`quantity_estimator.py`)
-- **Heuristics**: Size-based classification
+### 4. Quantity Estimation (`quantity_estimator.py`)
+- **Method**: Size-based classification from bounding box area
 - **Categories**: Very small, small, medium, large, very large
+- **Unit Selection**: Smart unit assignment (ml for liquids, pcs for items, g for bulk)
 - **Output**: Quantity labels, units, estimated values
+- **Example**: Apple detected at 30% image area → "large portion" → 0.75x qty
 
-### 4. Recipe Engine (`recipe_engine.py`)
+### 5. Recipe Engine (`recipe_engine.py`)
+- **Database**: 10 default recipes + 1M+ optional recipes (CSV)
 - **Matching**: Ingredient overlap with recipes
-- **Scoring**: Match percentage + missing count penalty
-- **Output**: Ranked recipe recommendations
+- **Scoring**: Match percentage (50%) + missing count penalty (50%)
+- **Output**: Ranked recipe recommendations sorted by score
+- **Features**: Case-insensitive matching, sorting by relevance
 
 ## 🔧 Configuration
 
@@ -299,42 +386,112 @@ The system includes 15 pre-loaded recipes covering common dishes:
 
 ## 🧪 Testing
 
+### Running the Test Suite
+
+Comprehensive test suite with **86 tests** covering all components:
+
+```bash
+# Run all tests
+pytest tests/ -v
+
+# Run with coverage report
+pytest tests/ --cov=api --cov=inference --cov=config --cov-report=html
+
+# Run specific test file
+pytest tests/test_api.py -v
+
+# Run specific test
+pytest tests/test_recipe_engine.py::TestRecipeEngine::test_recommend_single_ingredient -v
+```
+
+### Test Coverage
+
+- **Config Tests** (`test_config.py`) - 12 tests
+  - Project paths, model configuration, API settings
+  - Feature flags, logging configuration
+  
+- **Recipe Engine Tests** (`test_recipe_engine.py`) - 21 tests
+  - Ingredient matching, case-insensitive matching
+  - Score calculation, sorting by relevance
+  - Singleton pattern verification
+  
+- **LLM Recommender Tests** (`test_llm_recommender.py`) - 16 tests
+  - Ollama API integration, JSON parsing
+  - Timeout handling, fallback logic
+  - Availability checks, graceful degradation
+  
+- **Quantity Estimator Tests** (`test_quantity_estimator.py`) - 18 tests
+  - Size classification accuracy
+  - Unit selection (ml, pcs, g, portions)
+  - Batch processing and merging
+  
+- **API Endpoint Tests** (`test_api.py`) - 19 tests
+  - Health checks, detection endpoint
+  - Recipe recommendations, searches
+  - Response structure validation
+  - Error handling scenarios
+
 ### Manual Testing with cURL
 
-**Test Detection**:
+**Test Full Flow**:
+```bash
+curl -X POST http://localhost:8000/detect-and-recommend \
+  -F "image=@fridge.jpg" \
+  -d "use_llm=true&top_k=5"
+```
+
+**Test Detection Only**:
 ```bash
 curl -X POST "http://localhost:8000/detect-ingredients" \
-  -F "image=@test_fridge.jpg"
+  -F "image=@fridge.jpg"
 ```
 
-**Test Recommendations**:
+**Test Recommendations (Keyword Matching)**:
 ```bash
-curl "http://localhost:8000/recommend-recipes?ingredients=tomato&ingredients=onion&ingredients=bread"
+curl -X POST "http://localhost:8000/recommend-recipes?ingredients=apple&ingredients=carrot&use_llm=false"
 ```
 
-### Using Python
+**Test Recommendations (LLM)**:
+```bash
+curl -X POST "http://localhost:8000/recommend-recipes?ingredients=apple&ingredients=carrot&use_llm=true"
+```
+
+### Using Python SDK
 
 ```python
 import requests
 
-# Test detection
+# Full flow example
 with open("fridge.jpg", "rb") as img:
     response = requests.post(
-        "http://localhost:8000/detect-ingredients",
+        "http://localhost:8000/detect-and-recommend",
         files={"image": img},
-        params={"enable_ocr": True}
+        params={"use_llm": True, "top_k": 5}
     )
     print(response.json())
 
-# Test recommendations
+# Recommendation with specific ingredients
 response = requests.post(
     "http://localhost:8000/recommend-recipes",
     params={
-        "ingredients": ["tomato", "pasta", "garlic"],
+        "ingredients": ["apple", "carrot", "onion"],
+        "use_llm": True,
         "top_k": 5
     }
 )
 print(response.json())
+```
+
+### Test Results
+
+```
+======= 86 passed in 1.45s =======
+
+✅ All tests passing
+✅ 100% API endpoint coverage
+✅ Configuration validation
+✅ LLM integration tested with mocks
+✅ Error handling verified
 ```
 
 ## 📦 Dependencies

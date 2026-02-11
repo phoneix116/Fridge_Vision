@@ -43,7 +43,9 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 cover/
-tests/test_output.log
+test_results.log
+tests/
+pytest_cache/
 
 # Jupyter Notebook
 .ipynb_checkpoints
@@ -116,6 +118,12 @@ models/model.pt
 test_images/
 test_outputs/
 temp_test_files/
+pytest_cache/
+.pytest_cache/
+test_results.log
+.coverage
+coverage.xml
+htmlcov/
 
 # Data files (except default files)
 data/*.csv
@@ -157,3 +165,18 @@ user_data/
 *.bin
 *.pickle
 *.pkl
+
+# Recipe data files (large CSV/NPY - users download separately)
+Recipe/
+*.npy
+*.csv
+
+# Server runtime files
+server.log
+nohup.out
+
+# Scripts output
+scripts/__pycache__/
+
+# Test images and outputs
+# (Already covered above in Test data section)

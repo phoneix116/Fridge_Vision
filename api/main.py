@@ -12,9 +12,10 @@ import tempfile
 import os
 
 from inference.model_inference import FoodDetectionInference
-from inference.ocr_engine import OCREngine
+from inference.ocr_engine import OCREngine, get_ocr_engine
 from inference.quantity_estimator import QuantityEstimator, merge_ingredients_with_quantities
-from inference.recipe_engine import RecipeEngine
+from inference.recipe_engine import RecipeEngine, get_recipe_engine
+from inference.llm_recipe_recommender import get_recipe_recommender
 from config import get_settings
 
 # Configure logging
@@ -39,6 +40,7 @@ _inference_engine = None
 _ocr_engine = None
 _recipe_engine = None
 _quantity_estimator = None
+_llm_recommender = None
 
 
 def get_inference():
@@ -75,6 +77,15 @@ def get_recipes():
         logger.info("Initializing recipe engine")
         _recipe_engine = get_recipe_engine()
     return _recipe_engine
+
+
+def get_llm_recommender():
+    """Get or initialize LLM recipe recommender."""
+    global _llm_recommender
+    if _llm_recommender is None:
+        logger.info("Initializing LLM recipe recommender...")
+        _llm_recommender = get_recipe_recommender(use_ollama=True)
+    return _llm_recommender
 
 
 # Response models
@@ -118,6 +129,17 @@ class RecipeResponse(BaseModel):
     status: str = Field("success")
     message: str
     ingredients_provided: List[str]
+    recipes: List[RecipeRecommendation]
+    timestamp: Optional[str] = None
+
+
+class FullFlowResponse(BaseModel):
+    """Response model for /detect-and-recommend endpoint."""
+    status: str = Field("success")
+    message: str
+    detected_ingredients: List[Detection]
+    total_items: int
+    image_info: Dict
     recipes: List[RecipeRecommendation]
     timestamp: Optional[str] = None
 
@@ -235,14 +257,17 @@ async def detect_ingredients(
 @app.post("/recommend-recipes")
 async def recommend_recipes(
     ingredients: List[str] = Query(..., description="List of available ingredients"),
+    use_llm: bool = Query(True, description="Use LLM for creative recommendations"),
     top_k: int = Query(5, ge=1, le=20, description="Number of recipes to return"),
     min_match: int = Query(1, ge=1, description="Minimum ingredients to match")
 ):
     """
     Recommend recipes based on available ingredients.
+    Uses LLM if available (Ollama), falls back to keyword matching.
     
     Args:
         ingredients: List of ingredient names
+        use_llm: Whether to use LLM for recommendations (if available)
         top_k: Number of top recipes to return
         min_match: Minimum ingredients that must match
         
@@ -253,19 +278,58 @@ async def recommend_recipes(
         if not ingredients:
             raise ValueError("No ingredients provided")
         
-        logger.info(f"Recommending recipes for {len(ingredients)} ingredients")
+        logger.info(f"Recommending recipes for {len(ingredients)} ingredients (use_llm={use_llm})")
         
-        # Get recipe engine
+        # Try LLM first if enabled
+        if use_llm:
+            llm_recommender = get_llm_recommender()
+            if llm_recommender:
+                logger.info("Using LLM for recipe generation")
+                llm_recipes = llm_recommender.generate_recipes(
+                    ingredients=ingredients,
+                    num_recipes=top_k
+                )
+                
+                if llm_recipes:
+                    # Format LLM recipes
+                    recipe_list = [
+                        RecipeRecommendation(
+                            recipe_id=rec.get("recipe_id", idx),
+                            name=rec.get("name", "Unknown"),
+                            description=rec.get("description", ""),
+                            matched_ingredients=ingredients,
+                            missing_ingredients=rec.get("additional_items", []),
+                            match_percentage=100.0,
+                            difficulty=rec.get("difficulty", "medium"),
+                            prep_time_mins=rec.get("prep_time_mins", 30),
+                            servings=rec.get("servings", 4),
+                            score=95.0  # LLM recipes get high score
+                        )
+                        for idx, rec in enumerate(llm_recipes, 1)
+                    ]
+                    
+                    response = RecipeResponse(
+                        message=f"Generated {len(recipe_list)} creative recipes using AI",
+                        ingredients_provided=ingredients,
+                        recipes=recipe_list
+                    )
+                    
+                    logger.info(f"LLM generated {len(recipe_list)} recipes")
+                    return JSONResponse(
+                        status_code=200,
+                        content=response.dict()
+                    )
+            else:
+                logger.info("LLM not available, falling back to keyword matching")
+        
+        # Fallback: keyword matching
         recipe_engine = get_recipes()
-        
-        # Get recommendations
         recommendations = recipe_engine.recommend_recipes(
             ingredients=ingredients,
             top_k=top_k,
             min_match=min_match
         )
         
-        # Format response
         recipe_list = [
             RecipeRecommendation(
                 recipe_id=rec["recipe_id"],
@@ -288,7 +352,7 @@ async def recommend_recipes(
             recipes=recipe_list
         )
         
-        logger.info(f"Recommended {len(recipe_list)} recipes")
+        logger.info(f"Recommended {len(recipe_list)} recipes (keyword matching)")
         return JSONResponse(
             status_code=200,
             content=response.dict()
@@ -301,6 +365,184 @@ async def recommend_recipes(
             content={
                 "status": "error",
                 "message": f"Recipe recommendation failed: {str(e)}"
+            }
+        )
+
+
+# Full flow: detect + recommend in one call
+@app.post("/detect-and-recommend")
+async def detect_and_recommend(
+    image: UploadFile = File(...),
+    use_llm: bool = Query(True, description="Use LLM for creative recommendations"),
+    top_k: int = Query(5, ge=1, le=20, description="Number of recipes to return"),
+    enable_ocr: bool = Query(False, description="Enable OCR for text extraction"),
+    confidence_threshold: float = Query(0.5, ge=0.0, le=1.0, description="Detection confidence threshold"),
+):
+    """
+    Full pipeline: detect ingredients from image and recommend recipes.
+    
+    1. Runs YOLOv8m detection on the uploaded image
+    2. Extracts ingredient names from detections
+    3. Generates recipe recommendations (LLM or keyword matching)
+    
+    Args:
+        image: Image file (JPEG, PNG, etc.)
+        use_llm: Use LLM for creative recipe recommendations
+        top_k: Number of recipes to return
+        enable_ocr: Whether to run OCR on the image
+        confidence_threshold: Minimum confidence for detections
+        
+    Returns:
+        Detected ingredients + recommended recipes in a single response
+    """
+    try:
+        logger.info(f"Full flow: received image {image.filename}")
+        
+        # --- Step 1: Save image ---
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp_file:
+            contents = await image.read()
+            tmp_file.write(contents)
+            tmp_path = tmp_file.name
+        
+        try:
+            # --- Step 2: Detect ingredients ---
+            inference_engine = get_inference()
+            inference_results = inference_engine.detect_from_file(tmp_path)
+            
+            detections = inference_results["detections"]
+            image_info = inference_results.get("image_info", {
+                "width": inference_results.get("image_size", (0, 0))[1],
+                "height": inference_results.get("image_size", (0, 0))[0],
+            })
+            
+            # Ensure width/height are available
+            img_w = image_info.get("width", 640)
+            img_h = image_info.get("height", 480)
+            
+            # Estimate quantities
+            quantity_estimator = QuantityEstimator(
+                image_width=img_w,
+                image_height=img_h
+            )
+            quantity_results = quantity_estimator.estimate_quantities_batch(detections)
+            
+            # Run OCR if enabled
+            ocr_results = None
+            if enable_ocr:
+                try:
+                    ocr_engine = get_ocr()
+                    ocr_results = ocr_engine.extract_text_from_bytes(contents)
+                except Exception as ocr_err:
+                    logger.warning(f"OCR skipped: {ocr_err}")
+            
+            # Merge detection + quantity data
+            merged_ingredients = merge_ingredients_with_quantities(
+                detections, quantity_results, ocr_results
+            )
+            
+            # Build detection list for response
+            detected_list = [
+                Detection(
+                    class_name=ing["ingredient"],
+                    confidence=ing["confidence"],
+                    count=ing["count"],
+                    quantity_estimate=ing["quantity_estimate"],
+                    estimated_unit=ing["estimated_unit"],
+                    source=ing.get("source", "detection"),
+                )
+                for ing in merged_ingredients
+            ]
+            
+            # --- Step 3: Extract ingredient names ---
+            ingredient_names = list({d.class_name.lower() for d in detected_list})
+            logger.info(f"Detected ingredients: {ingredient_names}")
+            
+            if not ingredient_names:
+                return JSONResponse(
+                    status_code=200,
+                    content=FullFlowResponse(
+                        message="No ingredients detected in the image",
+                        detected_ingredients=[],
+                        total_items=0,
+                        image_info=image_info,
+                        recipes=[],
+                    ).dict()
+                )
+            
+            # --- Step 4: Recommend recipes ---
+            recipe_list = []
+            
+            if use_llm:
+                llm_recommender = get_llm_recommender()
+                if llm_recommender:
+                    llm_recipes = llm_recommender.generate_recipes(
+                        ingredients=ingredient_names,
+                        num_recipes=top_k,
+                    )
+                    if llm_recipes:
+                        recipe_list = [
+                            RecipeRecommendation(
+                                recipe_id=rec.get("recipe_id", idx),
+                                name=rec.get("name", "Unknown"),
+                                description=rec.get("description", ""),
+                                matched_ingredients=ingredient_names,
+                                missing_ingredients=rec.get("additional_items", []),
+                                match_percentage=100.0,
+                                difficulty=rec.get("difficulty", "medium"),
+                                prep_time_mins=rec.get("prep_time_mins", 30),
+                                servings=rec.get("servings", 4),
+                                score=95.0,
+                            )
+                            for idx, rec in enumerate(llm_recipes, 1)
+                        ]
+            
+            # Fallback to keyword matching
+            if not recipe_list:
+                recipe_engine = get_recipes()
+                recommendations = recipe_engine.recommend_recipes(
+                    ingredients=ingredient_names,
+                    top_k=top_k,
+                    min_match=1,
+                )
+                recipe_list = [
+                    RecipeRecommendation(
+                        recipe_id=rec["recipe_id"],
+                        name=rec["name"],
+                        description=rec["description"],
+                        matched_ingredients=rec["matched_ingredients"],
+                        missing_ingredients=rec["missing_ingredients"],
+                        match_percentage=rec["match_percentage"],
+                        difficulty=rec["difficulty"],
+                        prep_time_mins=rec["prep_time_mins"],
+                        servings=rec["servings"],
+                        score=rec["score"],
+                    )
+                    for rec in recommendations
+                ]
+            
+            # --- Step 5: Return combined response ---
+            response = FullFlowResponse(
+                message=f"Detected {len(detected_list)} ingredients, generated {len(recipe_list)} recipes",
+                detected_ingredients=detected_list,
+                total_items=len(detections),
+                image_info=image_info,
+                recipes=recipe_list,
+            )
+            
+            logger.info(f"Full flow complete: {len(detected_list)} ingredients → {len(recipe_list)} recipes")
+            return JSONResponse(status_code=200, content=response.dict())
+        
+        finally:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+    
+    except Exception as e:
+        logger.error(f"Full flow error: {str(e)}", exc_info=True)
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "error",
+                "message": f"Detection and recommendation failed: {str(e)}"
             }
         )
 
@@ -453,7 +695,8 @@ async def api_info():
             "description": "Food detection and recipe recommendation API",
             "endpoints": {
                 "detect": "/detect-ingredients (POST) - Detect ingredients in image",
-                "recommend": "/recommend-recipes (GET) - Get recipe recommendations",
+                "recommend": "/recommend-recipes (POST) - Get recipe recommendations",
+                "full_flow": "/detect-and-recommend (POST) - Image → detect → recipes in one call",
                 "search": "/recipes/search (GET) - Search recipes",
                 "list": "/recipes (GET) - List all recipes",
                 "get": "/recipes/{id} (GET) - Get recipe by ID",
