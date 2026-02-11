@@ -22,9 +22,18 @@ COPY . .
 # Expose port
 EXPOSE 8000
 
+# Environment variables for cloud deployment
+ENV OLLAMA_API_URL="http://localhost:11434"
+ENV HF_API_TOKEN=""
+ENV USE_HF_FALLBACK="true"
+ENV MODEL_PATH="models/weights2_fridge_vision.pt"
+ENV CONFIDENCE_THRESHOLD="0.5"
+ENV HOST="0.0.0.0"
+ENV PORT="8000"
+
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:8000/health')"
+    CMD python -c "import requests; requests.get('http://localhost:8000/health')" || exit 1
 
 # Run application
 CMD ["python", "run_server.py"]
