@@ -15,8 +15,8 @@ A mobile-first, backend-only AI application that detects food ingredients from f
 ## 🛠️ Tech Stack
 
 - **Backend**: Python + FastAPI + Uvicorn
-- **Detection Model**: YOLOv8m (Ultralytics) - mAP50: 0.866, 30 food classes
-- **LLM Recipes**: Ollama (local) + Mistral-7B (with HuggingFace fallback)
+- **Detection Model**: YOLOv8l (Ultralytics) - mAP50: 95.2%, 30 food classes (improved from YOLOv8m: 86.6%)
+- **LLM Recipes**: Ollama (local) + Mistral-7B (with HuggingFace Inference API fallback for cloud)
 - **OCR**: EasyOCR
 - **Image Processing**: OpenCV, NumPy, Pillow
 - **Testing**: pytest (86 tests, 100% passing)
@@ -76,17 +76,24 @@ pip install -r requirements.txt
 
 ### 3. Prepare Your Model
 
-Place your **pre-trained YOLOv8m model file** in the models directory:
+Place your **pre-trained YOLOv8l model file** in the models directory:
 
 ```bash
-# Download our trained model (52.1MB)
-# Or place your own: models/weights2_fridge_vision.pt
+# YOLOv8l Model (Latest - Recommended)
+# models/weights3_fridge_vision_yolov8l.pt
+# Performance: mAP50=95.2%, mAP50-95=76.1%
+# Size: 87.7MB (via Git LFS)
+
+# Or YOLOv8m baseline:
+# models/weights2_fridge_vision.pt
+# Performance: mAP50=86.6%, mAP50-95=66.3%
+# Size: 52.1MB
 
 # Model specs:
-# - Architecture: YOLOv8m (Medium variant)
-# - Classes: 30 food items (apple, banana, carrot, tomato, etc.)
-# - Performance: mAP50=0.866, mAP50-95=0.663
-# - File: models/weights2_fridge_vision.pt
+# - Architecture: YOLOv8 (Large variant recommended)
+# - Classes: 30 food items
+# - Preprocessing: Letterboxing with aspect-ratio preservation
+# - File: models/weights*.pt (PyTorch format)
 ```
 
 Supported formats: `.pt` (PyTorch/YOLO), `.h5` (TensorFlow)
@@ -115,8 +122,8 @@ If Ollama is unavailable, the system automatically falls back to keyword matchin
 Edit `config.py` to customize settings:
 
 ```python
-MODEL_PATH = "models/weights2_fridge_vision.pt"
-CONF_THRESHOLD = 0.5        # Detection confidence threshold
+MODEL_PATH = "models/weights3_fridge_vision_yolov8l.pt"
+CONF_THRESHOLD = 0.3        # Detection confidence threshold (lowered for better sensitivity)
 IOU_THRESHOLD = 0.45        # NMS IOU threshold
 ENABLE_OCR = True           # Enable text extraction
 ENABLE_QUANTITY_ESTIMATION = True
@@ -302,22 +309,31 @@ curl "http://localhost:8000/health"
 ## 🧠 AI Components
 
 ### 1. Object Detection (`model_inference.py`)
-- **Model**: YOLOv8m (Ultralytics)
+- **Model**: YOLOv8l (Ultralytics) - Improved from YOLOv8m
 - **Classes**: 30 food items (apple, banana, carrot, tomato, potato, etc.)
-- **Performance**: mAP50=0.866, mAP50-95=0.663
-- **Confidence Threshold**: 0.5 (configurable)
-- **Speed**: ~500ms per image (GPU) / ~1.5s (CPU)
+- **Performance**: mAP50=95.2%, mAP50-95=76.1% (improved from YOLOv8m: 86.6% / 66.3%)
+- **Confidence Threshold**: 0.3 (lowered for better sensitivity, configurable)
+- **Speed**: ~19ms per image (T4 GPU) / ~500ms (CPU)
 - **Output**: Bounding boxes, class names, confidence scores
+- **Preprocessing**: Letterboxing (aspect-ratio preserving, no distortion)
 
 ### 2. LLM Recipe Engine (`llm_recipe_recommender.py`) ⭐ NEW
-- **Backend**: Ollama (local) + Mistral-7B
-- **Fallback**: HuggingFace Inference API
-- **Speed**: ~5-10 seconds per request
+- **Local Backend**: Ollama (local machine) + Mistral-7B
+  - Best for development/testing on your laptop
+  - Free, no API keys required
+  - Requires: `ollama serve` running
+  
+- **Cloud Backend**: HuggingFace Inference API (recommended for production)
+  - Best for cloud deployment (Railway, Render, Heroku, etc.)
+  - Uses same Mistral-7B model
+  - Requires: HuggingFace API token (free tier available)
+  - Speed: ~5-30 seconds per request (LLM inference)
+  
 - **Features**: 
-  - Creative recipe generation from ingredients
+  - Creative recipe generation from detected ingredients
   - Dietary restrictions support (vegan, gluten-free, etc.)
   - Recipe refinement and clarification
-- **Graceful Degradation**: Falls back to keyword matching if unavailable
+  - Graceful fallback to keyword matching if both unavailable
 
 ### 3. OCR Engine (`ocr_engine.py`)
 - **Library**: EasyOCR
@@ -516,22 +532,84 @@ This project builds upon open-source work from:
 
 **License**: MIT/Apache 2.0 compatible
 
+## 🌐 Cloud Deployment
+
+### Deploy to Railway / Render
+
+**Option 1: HuggingFace Inference API (Recommended)** ✅
+Best for cloud without running Ollama server.
+
+```bash
+# 1. Get HuggingFace API Token
+# - Go to https://huggingface.co/settings/tokens
+# - Create a new token (read access)
+
+# 2. Deploy to Railway/Render with environment variables:
+HF_API_TOKEN="hf_xxxxxxxxxxxx"  # Your HuggingFace token
+CONF_THRESHOLD="0.3"
+MODEL_PATH="models/weights3_fridge_vision_yolov8l.pt"
+
+# 3. Test the cloud API
+curl -X POST https://your-app.railway.app/detect-and-recommend \
+  -F "image=@fridge.jpg" \
+  -F "use_llm=true"
+```
+
+**Option 2: Docker with Local Ollama** (Advanced)
+Use docker-compose if you want Ollama running in your cloud:
+```yaml
+version: '3.8'
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      OLLAMA_API_URL: "http://ollama:11434"
+    depends_on:
+      - ollama
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    command: serve
+
+volumes:
+  ollama_data:
+```
+
+**Option 3: Fallback Mode** (No LLM)
+IF Ollama and HuggingFace are both unavailable, system falls back to keyword-based recipe matching.
+
+### Deployment Checklist
+- [ ] Model file (`weights3_fridge_vision_yolov8l.pt`) in `models/`
+- [ ] HuggingFace token set (or Ollama available)
+- [ ] Environment variables configured
+- [ ] Test with `/health` endpoint
+- [ ] Try `/detect-and-recommend` with sample image
+
 ## 🚀 Future Enhancements
 
-- [ ] Fine-tune YOLO on custom food dataset
+- [x] YOLOv8l model training (mAP50: 95.2% ✓)
+- [x] LLM integration with HuggingFace fallback ✓
+- [x] Full /detect-and-recommend endpoint ✓
+- [ ] Phase 2 training (additional food classes)
 - [ ] Add more OCR languages
 - [ ] Implement user preference learning
 - [ ] Add nutritional information
 - [ ] Support batch image processing
 - [ ] Implement caching for frequently detected items
 - [ ] Add authentication/API keys
-- [ ] Docker containerization
 
 ## ⚡ Performance Notes
 
-- **Model Loading**: ~2-5 seconds (first run)
-- **Inference**: ~500ms per image (GPU) / ~1.5s (CPU)
+- **Model Loading**: ~2-5 seconds (first run, YOLOv8l is larger than YOLOv8m)
+- **Inference**: ~19ms per image (T4 GPU) / ~500ms (CPU) with YOLOv8l
 - **OCR**: ~1-3 seconds per image
+- **LLM Recipe Generation**: ~5-30 seconds per request (cloud-dependent)
 - **Memory**: ~4GB peak (VRAM for GPU models)
 
 ## 🐛 Troubleshooting
