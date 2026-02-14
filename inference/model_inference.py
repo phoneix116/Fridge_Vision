@@ -63,19 +63,36 @@ class FoodDetectionInference:
     
     def preprocess(self, image: np.ndarray) -> np.ndarray:
         """
-        Preprocess image matching Roboflow training:
-        1. Auto-orient (handled by cv2.imread automatically)
-        2. Resize: Stretch to 640x640
+        Preprocess image with letterboxing (padding to maintain aspect ratio).
+        Instead of stretching, adds black borders to fit 640x640.
         
         Args:
             image: Input image (numpy array in BGR format)
             
         Returns:
-            Preprocessed image (640x640)
+            Padded image (640x640) with black borders
         """
-        # Resize to 640x640 (match training size)
-        resized = cv2.resize(image, (self.IMG_SIZE, self.IMG_SIZE))
-        return resized
+        h, w = image.shape[:2]
+        
+        # Calculate scale to fit within 640x640 while maintaining aspect ratio
+        scale = min(self.IMG_SIZE / h, self.IMG_SIZE / w)
+        new_h = int(h * scale)
+        new_w = int(w * scale)
+        
+        # Resize image maintaining aspect ratio
+        resized = cv2.resize(image, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
+        
+        # Create 640x640 black canvas
+        canvas = np.zeros((self.IMG_SIZE, self.IMG_SIZE, 3), dtype=np.uint8)
+        
+        # Calculate padding to center the image
+        top = (self.IMG_SIZE - new_h) // 2
+        left = (self.IMG_SIZE - new_w) // 2
+        
+        # Place resized image in center of canvas
+        canvas[top:top+new_h, left:left+new_w] = resized
+        
+        return canvas
     
     def detect_from_file(self, image_path: str) -> Dict:
         """
