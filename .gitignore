@@ -181,3 +181,18 @@ scripts/__pycache__/
 
 # Test images and outputs
 # (Already covered above in Test data section)
+# Test scripts
+inference_test.py
+test_banana.py
+test_fridge1.py
+test_ollama.py
+test_full_pipeline.py
+visualize_preprocessing.py
+
+# Visualization and preprocessing output
+visualization_output/
+
+# Documentation files (auto-generated)
+COMPLETION_SUMMARY.md
+PIPELINE_UPDATED.md
+PROJECT_SUMMARY.py

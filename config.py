@@ -19,7 +19,7 @@ RECIPES_FILE = DATA_DIR / "recipes.json"
 MODEL_PATH = os.getenv("MODEL_PATH", str(PROJECT_ROOT / "models" / "weights2_fridge_vision.pt"))
 MODEL_CONFIG = {
     "model_path": MODEL_PATH,
-    "conf_threshold": float(os.getenv("CONF_THRESHOLD", "0.5")),
+    "conf_threshold": float(os.getenv("CONF_THRESHOLD", "0.3")),
     "iou_threshold": float(os.getenv("IOU_THRESHOLD", "0.45")),
 }
 

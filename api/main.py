@@ -187,7 +187,13 @@ async def detect_ingredients(
             inference_results = inference_engine.detect_from_file(tmp_path)
             
             detections = inference_results["detections"]
-            image_info = inference_results["image_info"]
+            img_h, img_w = inference_results.get("image_size", (480, 640))
+            
+            # Build image_info dict
+            image_info = {
+                "width": img_w,
+                "height": img_h,
+            }
             
             # Estimate quantities
             quantity_estimator = QuantityEstimator(
@@ -410,14 +416,12 @@ async def detect_and_recommend(
             inference_results = inference_engine.detect_from_file(tmp_path)
             
             detections = inference_results["detections"]
-            image_info = inference_results.get("image_info", {
-                "width": inference_results.get("image_size", (0, 0))[1],
-                "height": inference_results.get("image_size", (0, 0))[0],
-            })
+            img_h, img_w = inference_results.get("image_size", (480, 640))
             
-            # Ensure width/height are available
-            img_w = image_info.get("width", 640)
-            img_h = image_info.get("height", 480)
+            image_info = {
+                "width": img_w,
+                "height": img_h,
+            }
             
             # Estimate quantities
             quantity_estimator = QuantityEstimator(

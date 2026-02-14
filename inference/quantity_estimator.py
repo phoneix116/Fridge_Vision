@@ -50,8 +50,10 @@ class QuantityEstimator:
             Dictionary with quantity estimate
         """
         bbox = detection["bbox"]
-        width = bbox["x2"] - bbox["x1"]
-        height = bbox["y2"] - bbox["y1"]
+        # bbox is [x1, y1, x2, y2] from YOLOv8 model
+        x1, y1, x2, y2 = bbox
+        width = x2 - x1
+        height = y2 - y1
         bbox_area = width * height
         
         # Calculate size relative to image
