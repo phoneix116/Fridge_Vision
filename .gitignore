@@ -98,18 +98,19 @@ logs/
 
 # Model files (users provide their own)
 weights/
-models/*.pt
+# Ignore temporary model files but allow trained weights
+models/best.pt
+models/model.pt
 models/*.h5
 models/*.onnx
 models/*.pb
 models/*.pth
 models/*.weights
-models/best.pt
-models/model.pt
-*.pt
 *.pth
 *.h5
 *.onnx
+# Allow specific trained weights
+!models/weights*.pt
 
 # Keep the models directory structure
 !models/.gitkeep
