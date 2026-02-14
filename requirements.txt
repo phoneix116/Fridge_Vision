@@ -8,6 +8,8 @@ opencv-python==4.8.1.78
 numpy==1.24.3
 Pillow==10.1.0
 easyocr==1.7.0
+ultralytics==8.0.196
+dill>=0.3.7
 yolov5==7.0.13
 # Testing dependencies
 pytest==7.4.3
