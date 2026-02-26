@@ -1,0 +1,18 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --cream: #FAF7F0;
+    --ink:   #1C1B1A;
+    --muted: #6B6560;
+    --border: #E8E4DC;
+  }
+  body {
+    font-family: 'Nunito', sans-serif;
+    background-color: var(--cream);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+  }
+}

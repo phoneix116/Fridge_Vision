@@ -16,7 +16,7 @@ from inference.ocr_engine import OCREngine, get_ocr_engine
 from inference.quantity_estimator import QuantityEstimator, merge_ingredients_with_quantities
 from inference.recipe_engine import RecipeEngine, get_recipe_engine
 from inference.llm_recipe_recommender import get_recipe_recommender
-from config import get_settings
+from config import get_settings, RECIPE_CONFIG
 
 # Configure logging
 logging.basicConfig(
@@ -75,7 +75,7 @@ def get_recipes():
     global _recipe_engine
     if _recipe_engine is None:
         logger.info("Initializing recipe engine")
-        _recipe_engine = get_recipe_engine()
+        _recipe_engine = get_recipe_engine(recipes_path=str(RECIPE_CONFIG["recipes_file"]))
     return _recipe_engine
 
 

@@ -16,7 +16,7 @@ CLASSES_FILE = DATA_DIR / "classes.txt"
 RECIPES_FILE = DATA_DIR / "recipes.json"
 
 # Model configuration
-MODEL_PATH = os.getenv("MODEL_PATH", str(PROJECT_ROOT / "models" / "weights2_fridge_vision.pt"))
+MODEL_PATH = os.getenv("MODEL_PATH", str(PROJECT_ROOT / "models" / "weights3_fridge_vision_yolov8l.pt"))
 MODEL_CONFIG = {
     "model_path": MODEL_PATH,
     "conf_threshold": float(os.getenv("CONF_THRESHOLD", "0.3")),
