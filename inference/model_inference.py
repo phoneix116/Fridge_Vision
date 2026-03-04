@@ -39,7 +39,7 @@ class FoodDetectionInference:
         Initialize detection pipeline with YOLOv8 model.
         
         Args:
-            model_path: Path to .pt model file (e.g., models/weights3_fridge_vision_yolov8l.pt)
+            model_path: Path to .pt model file (e.g., models/weights4_fridge_vision_yolov8l.pt)
             conf: Confidence threshold (default 0.25)
             iou: IOU threshold for NMS (default 0.7, matches training)
         """
@@ -50,7 +50,7 @@ class FoodDetectionInference:
         # Load YOLOv8 model directly from ultralytics
         try:
             if model_path is None:
-                model_path = "models/weights3_fridge_vision_yolov8l.pt"
+                model_path = "models/weights4_fridge_vision_yolov8l.pt"
             
             self.model = YOLO(model_path)
             logger.info(f"✅ Detection pipeline initialized with YOLOv8 model: {model_path}")

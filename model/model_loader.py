@@ -43,6 +43,8 @@ class ModelLoader:
             # Try common locations and env variable
             common_paths = [
                 os.getenv('MODEL_PATH'),
+                'models/weights4_fridge_vision_yolov8l.pt',
+                'models/weights3_fridge_vision_yolov8l.pt',
                 'models/model.pt',
                 'models/best.pt',
                 'model.pt',
