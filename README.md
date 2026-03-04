@@ -1,3 +1,14 @@
+---
+title: Fridge Vision
+emoji: 🥗
+colorFrom: green
+colorTo: blue
+sdk: docker
+app_port: 8000
+pinned: false
+---
+
+# Fridge Vision: AI-Powered Food Detection & Recipe Recommendation System
 # Fridge Vision API
 
 Fridge Vision is a FastAPI backend that detects food ingredients from fridge images and recommends recipes.

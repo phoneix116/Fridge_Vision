@@ -243,7 +243,12 @@ export default function Landing({ onStart }) {
       {/* ── Footer ── */}
       <footer className="px-6 sm:px-12 py-6 border-t flex items-center justify-between max-w-6xl mx-auto" style={{ borderColor: '#E8E4DC' }}>
         <span className="font-black text-sm" style={{ color: '#1C1B1A' }}>Fridge Vision</span>
-        <span className="text-xs" style={{ color: '#C8C3BB' }}>Powered by YOLOv8 · LLM recipe matching</span>
+        <span className="text-xs" style={{ color: '#C8C3BB' }}>
+          Built by{' '}
+          <a href="https://github.com/phoneix116" target="_blank" rel="noopener noreferrer" className="underline hover:opacity-70">Cyril George</a>
+          {' '}and{' '}
+          <a href="https://github.com/NoNameWrath" target="_blank" rel="noopener noreferrer" className="underline hover:opacity-70">Michael Abejo</a>
+        </span>
       </footer>
 
     </div>

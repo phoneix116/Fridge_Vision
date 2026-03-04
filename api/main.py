@@ -5,6 +5,7 @@ Handles ingredient detection and recipe recommendations.
 
 import logging
 from fastapi import FastAPI, UploadFile, File, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from typing import List, Dict, Optional
@@ -33,6 +34,13 @@ app = FastAPI(
     title="Fridge Vision API",
     description="Backend API for food detection and recipe recommendations",
     version="1.0.0"
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Initialize AI engines (lazy loading on first request)
