@@ -1,3 +1,13 @@
+---
+title: Fridge Vision
+emoji: 🥗
+colorFrom: green
+colorTo: blue
+sdk: docker
+app_port: 8000
+pinned: false
+---
+
 # Fridge Vision: AI-Powered Food Detection & Recipe Recommendation System
 
 A mobile-first, backend-only AI application that detects food ingredients from fridge images using **YOLOv8m** object detection, extracts text via OCR, estimates quantities, and recommends recipes using **Ollama LLM** (or keyword matching fallback).

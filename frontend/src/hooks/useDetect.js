@@ -27,8 +27,10 @@ export function useDetect() {
     const formData = new FormData()
     formData.append('image', imageFile)
 
+    const apiBase = import.meta.env.VITE_API_BASE_URL ?? '/api'
+
     try {
-      const response = await fetch(`/api/detect-and-recommend?${params}`, {
+      const response = await fetch(`${apiBase}/detect-and-recommend?${params}`, {
         method: 'POST',
         body: formData,
       })
