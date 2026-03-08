@@ -1,7 +1,7 @@
 """
 Model loading module for food detection.
 Loads local model file provided by user.
-Supports YOLO (.pt) and TensorFlow (.h5) models.
+Supports Ultralytics YOLO (.pt) and TensorFlow (.h5) models.
 """
 
 import logging
@@ -17,13 +17,15 @@ class ModelLoader:
     _instance = None
     _model = None
     _model_path = None
+    _conf_threshold = 0.25
+    _iou_threshold = 0.5
     
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
     
-    def load_model(self, model_path: Optional[str] = None, conf: float = 0.25, iou: float = 0.45):
+    def load_model(self, model_path: Optional[str] = None, conf: float = 0.25, iou: float = 0.5):
         """
         Load model from local file.
         
@@ -43,10 +45,11 @@ class ModelLoader:
             # Try common locations and env variable
             common_paths = [
                 os.getenv('MODEL_PATH'),
+                'models/weight5_multi_yolov11L.pt',
+                'models/best.pt',
                 'models/weights4_fridge_vision_yolov8l.pt',
                 'models/weights3_fridge_vision_yolov8l.pt',
                 'models/model.pt',
-                'models/best.pt',
                 'model.pt',
             ]
             model_path = next((p for p in common_paths if p and os.path.exists(p)), None)
@@ -55,7 +58,7 @@ class ModelLoader:
                 raise FileNotFoundError(
                     "❌ Model file not found. Please:\n"
                     "1. Set MODEL_PATH environment variable, OR\n"
-                    "2. Place model in models/ directory (model.pt or best.pt)"
+                    "2. Place model in models/ directory (weight5_multi_yolov11L.pt, best.pt, or model.pt)"
                 )
         
         # Return cached model if same path
@@ -70,20 +73,18 @@ class ModelLoader:
         
         try:
             model_ext = Path(model_path).suffix.lower()
+            self._conf_threshold = conf
+            self._iou_threshold = iou
             
             if model_ext == '.pt':
-                # PyTorch/YOLO model
-                import torch
-                self._model = torch.hub.load(
-                    'ultralytics/yolov5',
-                    'custom',
-                    path=model_path,
-                    force_reload=False
-                )
-                if hasattr(self._model, 'conf'):
-                    self._model.conf = conf
-                    self._model.iou = iou
-                logger.info(f"✅ YOLO model loaded (conf={conf}, iou={iou})")
+                # Ultralytics YOLO model (YOLOv8/YOLOv11)
+                from ultralytics import YOLO
+
+                self._model = YOLO(model_path)
+                if hasattr(self._model, 'overrides') and isinstance(self._model.overrides, dict):
+                    self._model.overrides['conf'] = conf
+                    self._model.overrides['iou'] = iou
+                logger.info(f"✅ Ultralytics YOLO model loaded (conf={conf}, iou={iou})")
                 
             elif model_ext == '.h5':
                 # TensorFlow/Keras model
@@ -110,7 +111,46 @@ class ModelLoader:
         """Get loaded model or load it if not already loaded."""
         if self._model is None:
             return self.load_model(model_path)
+        if model_path is not None and str(model_path) != self._model_path:
+            return self.load_model(model_path, conf=self._conf_threshold, iou=self._iou_threshold)
         return self._model
+
+    @property
+    def model_path(self) -> Optional[str]:
+        """Return currently loaded model path."""
+        return self._model_path
+
+    @property
+    def conf_threshold(self) -> float:
+        """Return confidence threshold stored in loader."""
+        return self._conf_threshold
+
+    @property
+    def iou_threshold(self) -> float:
+        """Return IOU threshold stored in loader."""
+        return self._iou_threshold
+
+    @property
+    def device(self) -> str:
+        """Best-effort device info for compatibility with old callers."""
+        if self._model is None:
+            return "unknown"
+        model_obj = getattr(self._model, 'model', None)
+        if model_obj is not None and hasattr(model_obj, 'device'):
+            return str(model_obj.device)
+        return "cpu"
+
+    def set_confidence_threshold(self, conf: float):
+        """Set default confidence threshold for compatibility with old callers."""
+        self._conf_threshold = conf
+        if self._model is not None and hasattr(self._model, 'overrides') and isinstance(self._model.overrides, dict):
+            self._model.overrides['conf'] = conf
+
+    def set_iou_threshold(self, iou: float):
+        """Set default IOU threshold for compatibility with old callers."""
+        self._iou_threshold = iou
+        if self._model is not None and hasattr(self._model, 'overrides') and isinstance(self._model.overrides, dict):
+            self._model.overrides['iou'] = iou
     
     def clear_cache(self):
         """Clear cached model (use when switching models)."""
@@ -119,6 +159,13 @@ class ModelLoader:
         logger.info("Model cache cleared")
 
 
-def get_model_loader() -> ModelLoader:
-    """Get singleton ModelLoader instance."""
-    return ModelLoader()
+def get_model_loader(
+    model_path: Optional[str] = None,
+    conf: float = 0.25,
+    iou: float = 0.5,
+) -> ModelLoader:
+    """Get singleton ModelLoader instance, optionally preloading a model."""
+    loader = ModelLoader()
+    if model_path is not None and (loader.model_path != str(model_path) or loader._model is None):
+        loader.load_model(model_path=model_path, conf=conf, iou=iou)
+    return loader
