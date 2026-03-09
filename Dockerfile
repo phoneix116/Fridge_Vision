@@ -26,7 +26,7 @@ EXPOSE 8000
 ENV OLLAMA_API_URL="http://localhost:11434"
 ENV HF_API_TOKEN=""
 ENV USE_HF_FALLBACK="true"
-ENV MODEL_PATH="models/weights3_fridge_vision_yolov8l.pt"
+ENV MODEL_PATH="models/weight5_multi_yolov11L.pt"
 ENV CONFIDENCE_THRESHOLD="0.5"
 ENV HOST="0.0.0.0"
 ENV PORT="8000"

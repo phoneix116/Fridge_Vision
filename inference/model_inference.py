@@ -1,6 +1,6 @@
 """
-Food detection inference pipeline (Updated for YOLOv8l).
-Uses local YOLOv8 model (.pt) with explicit preprocessing.
+Food detection inference pipeline (Updated for YOLOv11L).
+Uses local YOLOv11 model (.pt) with explicit preprocessing.
 Supports single and batch inference.
 """
 
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 class FoodDetectionInference:
     """
-    Food detection pipeline using YOLOv8 model (YOLOv8m/YOLOv8l).
+    Food detection pipeline using YOLOv11 model (YOLOv11L).
     Matches Roboflow preprocessing: Auto-orient, Resize to 640x640.
     """
     
@@ -36,24 +36,24 @@ class FoodDetectionInference:
     
     def __init__(self, model_path: Optional[str] = None, conf: float = 0.25, iou: float = 0.7):
         """
-        Initialize detection pipeline with YOLOv8 model.
-        
+        Initialize detection pipeline with YOLOv11 model.
+
         Args:
-            model_path: Path to .pt model file (e.g., models/weights4_fridge_vision_yolov8l.pt)
+            model_path: Path to .pt model file (e.g., models/weight5_multi_yolov11L.pt)
             conf: Confidence threshold (default 0.25)
             iou: IOU threshold for NMS (default 0.7, matches training)
         """
         self.conf = conf
         self.iou = iou
         self.model = None
-        
-        # Load YOLOv8 model directly from ultralytics
+
+        # Load YOLOv11 model directly from ultralytics
         try:
             if model_path is None:
-                model_path = "models/weights4_fridge_vision_yolov8l.pt"
-            
+                model_path = "models/weight5_multi_yolov11L.pt"
+
             self.model = YOLO(model_path)
-            logger.info(f"✅ Detection pipeline initialized with YOLOv8 model: {model_path}")
+            logger.info(f"✅ Detection pipeline initialized with YOLOv11 model: {model_path}")
             logger.info(f"   Inference size: {self.IMG_SIZE}x{self.IMG_SIZE}")
             logger.info(f"   Confidence threshold: {self.conf}")
             logger.info(f"   IOU threshold: {self.iou}")
@@ -180,7 +180,7 @@ class FoodDetectionInference:
             raise RuntimeError("Model not loaded. Check model_path configuration.")
         
         try:
-            logger.info(f"Running YOLOv8 inference on {self.IMG_SIZE}x{self.IMG_SIZE} image")
+            logger.info(f"Running YOLOv11 inference on {self.IMG_SIZE}x{self.IMG_SIZE} image")
             
             # Run inference
             results = self.model(
@@ -191,7 +191,7 @@ class FoodDetectionInference:
                 verbose=False
             )
             
-            # Parse results (YOLOv8 format)
+            # Parse results (YOLOv11 format)
             detections = self._parse_results(results[0])
             logger.info(f"Detections found: {len(detections)}")
             
@@ -209,10 +209,10 @@ class FoodDetectionInference:
     
     def _parse_results(self, results) -> List[Dict]:
         """
-        Parse YOLOv8l Results object.
+        Parse YOLOv11l Results object.
         
         Args:
-            results: YOLOv8 Results object (from model.predict)
+            results: YOLOv11 Results object (from model.predict)
             
         Returns:
             List of detection dictionaries
@@ -220,7 +220,7 @@ class FoodDetectionInference:
         detections = []
         
         try:
-            # YOLOv8 format: results.boxes contains detection info
+            # YOLOv11 format: results.boxes contains detection info
             if hasattr(results, 'boxes') and results.boxes is not None:
                 boxes = results.boxes
                 
@@ -245,10 +245,10 @@ class FoodDetectionInference:
                         'area': float((x2 - x1) * (y2 - y1))
                     })
                 
-                logger.info(f"Parsed {len(detections)} detections from YOLOv8 results")
+                logger.info(f"Parsed {len(detections)} detections from YOLOv11 results")
             
             else:
-                logger.warning("No boxes found in YOLOv8 results")
+                logger.warning("No boxes found in YOLOv11 results")
             
         except Exception as e:
             logger.warning(f"Result parsing issue: {e}")
